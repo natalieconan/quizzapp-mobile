@@ -12,6 +12,9 @@ class _QuizScreenState extends State<QuizScreen> {
   var correctAnswer;
   var answers = [];
   var answerChosen = null;
+  var point = 0;
+  var questionIndex = 1;
+  var limitIndex = 20;
   var unsetButtonStyle = ElevatedButton.styleFrom(
     primary: Colors.white,
     onPrimary: Colors.black,
@@ -45,10 +48,16 @@ class _QuizScreenState extends State<QuizScreen> {
     padding: EdgeInsets.all(20),
   );
 
+  void renewState() {
+    fetchQuestions();
+    point = 0;
+    questionIndex = 1;
+  }
+
   @override
   void initState() {
     super.initState();
-    fetchQuestions();
+    renewState();
   }
 
   Future<void> fetchQuestions() async {
@@ -62,12 +71,19 @@ class _QuizScreenState extends State<QuizScreen> {
         _questions = List<Map<String, dynamic>>.from(responseData['results']);
 
         // Extract the correct answer
-        correctAnswer = responseData['results'][0]['correct_answer'];
-
+        try {
+          correctAnswer = responseData['results'][0]['correct_answer'];
+        } catch (Error) {
+          correctAnswer = null;
+        }
         // Extract the incorrect answers
-        var incorrectAnswers =
-            List<String>.from(responseData['results'][0]['incorrect_answers']);
-
+        var incorrectAnswers;
+        try {
+          incorrectAnswers = List<String>.from(
+              responseData['results'][0]['incorrect_answers']);
+        } catch (Error) {
+          incorrectAnswers = null;
+        }
         // Combine correct and incorrect answers into a single list
         answers = [correctAnswer, ...incorrectAnswers];
         answers.shuffle();
@@ -96,6 +112,11 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Text(
+              'Question $questionIndex:',
+              style: TextStyle(fontSize: 30.0),
+            ),
+            SizedBox(height: 50.0),
             for (var question in _questions)
               Text(
                 question['question'],
@@ -114,10 +135,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       setState(() {
                         answerChosen = answer;
                       });
+
                       if (answer == correctAnswer) {
-                        print("Correct");
-                      } else {
-                        print("Incorrect");
+                        point = point + 1;
                       }
                     },
                     style: answerChosen == null
@@ -139,7 +159,13 @@ class _QuizScreenState extends State<QuizScreen> {
             if (answerChosen != null)
               ElevatedButton(
                 onPressed: () {
+                  if (questionIndex >= limitIndex) {
+                    renewState();
+                    return;
+                  }
+
                   answerChosen != null ? fetchQuestions() : () => {};
+                  questionIndex = questionIndex + 1;
                 },
                 style: ElevatedButton.styleFrom(
                   side: BorderSide(width: 2, color: Colors.black),
@@ -149,8 +175,17 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   padding: EdgeInsets.all(30),
                 ),
-                child: Text("Next"),
-              )
+                child: questionIndex >= limitIndex
+                    ? Text("Restart")
+                    : Text("Next"),
+              ),
+
+            SizedBox(height: 50.0), // Add SizedBox for spacing
+            if (questionIndex == limitIndex && answerChosen != null)
+              Text(
+                'Your score is: $point',
+                style: TextStyle(fontSize: 15.0),
+              ),
           ],
         ),
       ),
